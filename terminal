@@ -1,0 +1,14 @@
+pnpm add rollup-plugin-copy -D 
+pnpm install
+pnpm dev 
+pnpm build 
+pnpm add @types/node -D 
+mkdir -p src/icons
+# 下载一个示例图标或使用自己的图标
+curl https://www.google.com/favicon.ico > src/icons/icon16.png 
+
+# 删除之前的构建文件
+rm -rf dist
+
+# 重新构建
+pnpm build 

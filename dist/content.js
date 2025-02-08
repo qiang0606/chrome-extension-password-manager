@@ -1,0 +1,1 @@
+chrome.runtime.onMessage.addListener((e,r,t)=>{if(e.action==="fillCredentials"){const{username:s,password:n}=e;document.querySelector('input[type="text"]').value=s,document.querySelector('input[type="password"]').value=n,t({success:!0})}});
