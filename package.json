@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "vercel-build": "vite build --mode web",
-    "vercel": "vercel"
+    "vercel": "vercel --prod"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
