@@ -159,9 +159,65 @@ export default {
 
         request.onerror = (event) => {
           console.error("IndexedDB 打开失败", event.target.error);
-          reject(event.target.error);
+          // 在网页环境中，如果 IndexedDB 失败，使用内存存储
+          if (window.location.pathname !== "/popup.html") {
+            console.warn("使用内存存储替代 IndexedDB");
+            db = createMemoryDB();
+            resolve(db);
+          } else {
+            reject(event.target.error);
+          }
         };
       });
+    };
+
+    // 创建内存数据库模拟对象（用于网页演示）
+    const createMemoryDB = () => {
+      let data = [];
+      return {
+        memoryDB: true,
+        transaction: () => ({
+          objectStore: () => ({
+            getAll: () => ({
+              onsuccess: function () {
+                this.result = data;
+                if (this.onsuccess) this.onsuccess();
+              },
+            }),
+            add: (item) => {
+              item.id = Date.now();
+              data.push(item);
+              return {
+                onsuccess: function () {
+                  if (this.onsuccess) this.onsuccess();
+                },
+              };
+            },
+            put: (item) => {
+              const index = data.findIndex((i) => i.id === item.id);
+              if (index >= 0) {
+                data[index] = item;
+              } else {
+                item.id = Date.now();
+                data.push(item);
+              }
+              return {
+                onsuccess: function () {
+                  if (this.onsuccess) this.onsuccess();
+                },
+              };
+            },
+            delete: (id) => {
+              data = data.filter((i) => i.id !== id);
+              return {
+                onsuccess: function () {
+                  if (this.onsuccess) this.onsuccess();
+                },
+              };
+            },
+          }),
+        }),
+      };
     };
 
     // **获取所有数据**
