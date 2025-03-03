@@ -1,69 +1,129 @@
 <template>
-  <el-container>
-    <el-header>Website & Account Manager</el-header>
-    <el-main>
-      <el-form :model="newWebsite" label-width="120px">
-        <el-form-item label="网站名字">
-          <el-input v-model="newWebsite.webName"></el-input>
-        </el-form-item>
-        <el-button type="primary" @click="addWebsite">添加网站</el-button>
-      </el-form>
-      <el-table :data="websites" style="width: 100%; margin-top: 20px">
-        <el-table-column prop="webName" label="网站名字">
-          <template #default="{ row }">
-            <el-button @click="showDetails(row)" link type="primary">{{
-              row.webName
-            }}</el-button>
-          </template>
-        </el-table-column>
-        <el-table-column label="Actions">
-          <template #default="{ row }">
-            <el-button @click="removeWebsite(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-dialog
-        v-model="dialogVisible"
-        title="网站详情"
-        :width="600"
-        :close-on-click-modal="false"
-      >
-        <el-button type="primary" @click="addAccount">新增</el-button>
-        <el-table :data="selectedWebsiteDetails" style="width: 100%">
-          <el-table-column prop="environment" label="环境"></el-table-column>
-          <el-table-column prop="url" width="200" label="URL">
+  <div class="popup-container">
+    <header class="popup-header">
+      <h1>Website & Account Manager</h1>
+    </header>
+
+    <main class="popup-main">
+      <div class="add-website-form">
+        <el-form :model="newWebsite" label-width="120px">
+          <el-form-item label="网站名字">
+            <el-input v-model="newWebsite.webName"></el-input>
+          </el-form-item>
+          <el-button type="primary" @click="addWebsite" class="add-btn"
+            >添加网站</el-button
+          >
+        </el-form>
+      </div>
+
+      <div class="website-list">
+        <el-table :data="websites" style="width: 100%">
+          <el-table-column prop="webName" label="网站名字">
             <template #default="{ row }">
-              <el-button @click="openUrl(row.url)" link type="primary">{{
-                row.url
-              }}</el-button>
-            </template>
-          </el-table-column>
-          <el-table-column prop="account" label="账号">
-            <template #default="{ row }">
-              <el-button @click="copyToClipboard(row.account)" link>
-                {{ row.account }}
-              </el-button>
-            </template>
-          </el-table-column>
-          <el-table-column prop="password" label="密码">
-            <template #default="{ row }">
-              <el-button @click="copyToClipboard(row.password)" link>
-                {{ row.password }}
-              </el-button>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="350">
-            <template #default="{ row }">
-              <el-button @click="editAccount(row)" link type="primary"
-                >修改</el-button
+              <el-button
+                @click="showDetails(row)"
+                link
+                type="primary"
+                class="website-link"
               >
-              <el-button @click="removeAccount(row)" link type="primary"
+                {{ row.webName }}
+              </el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="100">
+            <template #default="{ row }">
+              <el-button
+                @click="removeWebsite(row)"
+                link
+                type="danger"
+                size="small"
                 >删除</el-button
               >
             </template>
           </el-table-column>
         </el-table>
+      </div>
+
+      <el-dialog
+        v-model="dialogVisible"
+        title="网站详情"
+        :width="800"
+        :close-on-click-modal="false"
+        class="details-dialog"
+      >
+        <el-button type="primary" @click="addAccount" class="add-account-btn"
+          >新增账号</el-button
+        >
+        <el-table
+          :data="selectedWebsiteDetails"
+          style="width: 100%; margin-top: 16px"
+        >
+          <el-table-column
+            prop="environment"
+            label="环境"
+            width="100"
+          ></el-table-column>
+          <el-table-column prop="url" width="180" label="URL">
+            <template #default="{ row }">
+              <el-button
+                @click="openUrl(row.url)"
+                link
+                type="primary"
+                class="url-link"
+              >
+                {{ row.url }}
+              </el-button>
+            </template>
+          </el-table-column>
+          <el-table-column prop="account" label="账号" width="150">
+            <template #default="{ row }">
+              <el-button
+                @click="copyToClipboard(row.account)"
+                link
+                class="copy-btn"
+              >
+                {{ row.account }}
+              </el-button>
+            </template>
+          </el-table-column>
+          <el-table-column prop="password" label="密码" width="150">
+            <template #default="{ row }">
+              <el-button
+                @click="copyToClipboard(row.password)"
+                link
+                class="copy-btn"
+              >
+                {{ row.password }}
+              </el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="130">
+            <template #default="{ row }">
+              <div class="action-buttons-row">
+                <el-link
+                  :underline="false"
+                  @click="editAccount(row)"
+                  type="primary"
+                  >修改</el-link
+                >
+                <el-link
+                  :underline="false"
+                  @click="removeAccount(row)"
+                  type="danger"
+                  >删除</el-link
+                >
+                <el-link
+                  :underline="false"
+                  @click="copyAccountRow(row)"
+                  type="success"
+                  >复制</el-link
+                >
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
       </el-dialog>
+
       <el-dialog
         v-model="addAccountDialog"
         :title="`${newAccount.accountId ? '修改' : '新增'}用户环境`"
@@ -96,8 +156,8 @@
           </el-button>
         </div>
       </el-dialog>
-    </el-main>
-  </el-container>
+    </main>
+  </div>
 </template>
 
 <script>
@@ -141,82 +201,74 @@ export default {
       return new Promise((resolve, reject) => {
         const request = indexedDB.open(dbName, 1);
 
-        // **数据库升级（创建表）**
-        request.onupgradeneeded = (event) => {
-          const db = event.target.result;
-          if (!db.objectStoreNames.contains(storeName)) {
-            db.createObjectStore(storeName, {
-              keyPath: "id",
-              autoIncrement: true,
-            });
-          }
+        request.onerror = (event) => {
+          console.error("数据库打开失败:", event);
+          reject("数据库打开失败");
         };
 
         request.onsuccess = (event) => {
           db = event.target.result;
-          resolve(db);
+          console.log("数据库打开成功");
+          resolve();
         };
 
-        request.onerror = (event) => {
-          console.error("IndexedDB 打开失败", event.target.error);
-          // 在网页环境中，如果 IndexedDB 失败，使用内存存储
-          if (window.location.pathname !== "/popup.html") {
-            console.warn("使用内存存储替代 IndexedDB");
-            db = createMemoryDB();
-            resolve(db);
-          } else {
-            reject(event.target.error);
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains(storeName)) {
+            db.createObjectStore(storeName, { keyPath: "id" });
+            console.log("数据库表创建成功");
           }
         };
       });
     };
 
-    // 创建内存数据库模拟对象（用于网页演示）
+    // 创建内存数据库（用于模拟）
     const createMemoryDB = () => {
       let data = [];
       return {
         memoryDB: true,
-        transaction: () => ({
-          objectStore: () => ({
-            getAll: () => ({
-              onsuccess: function () {
-                this.result = data;
-                if (this.onsuccess) this.onsuccess();
-              },
-            }),
-            add: (item) => {
-              item.id = Date.now();
-              data.push(item);
+        transaction: () => {
+          return {
+            objectStore: () => {
               return {
-                onsuccess: function () {
-                  if (this.onsuccess) this.onsuccess();
+                add: (item) => {
+                  data.push(item);
+                  return {
+                    onsuccess: () => {},
+                  };
+                },
+                put: (item) => {
+                  const index = data.findIndex((i) => i.id === item.id);
+                  if (index !== -1) {
+                    data[index] = item;
+                  }
+                  return {
+                    onsuccess: () => {},
+                  };
+                },
+                delete: (id) => {
+                  data = data.filter((item) => item.id !== id);
+                  return {
+                    onsuccess: () => {},
+                  };
+                },
+                get: (id) => {
+                  const item = data.find((item) => item.id === id);
+                  return {
+                    result: item,
+                    onsuccess: () => {},
+                  };
+                },
+                getAll: () => {
+                  return {
+                    result: data,
+                    onsuccess: () => {},
+                  };
                 },
               };
             },
-            put: (item) => {
-              const index = data.findIndex((i) => i.id === item.id);
-              if (index >= 0) {
-                data[index] = item;
-              } else {
-                item.id = Date.now();
-                data.push(item);
-              }
-              return {
-                onsuccess: function () {
-                  if (this.onsuccess) this.onsuccess();
-                },
-              };
-            },
-            delete: (id) => {
-              data = data.filter((i) => i.id !== id);
-              return {
-                onsuccess: function () {
-                  if (this.onsuccess) this.onsuccess();
-                },
-              };
-            },
-          }),
-        }),
+          };
+        },
       };
     };
 
@@ -439,6 +491,23 @@ export default {
       }
     };
 
+    const copyAccountRow = (row) => {
+      const text = `环境: ${row.environment}
+URL: ${row.url}
+账号: ${row.account}
+密码: ${row.password}`;
+
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          ElMessage.success("账号信息已复制到剪贴板");
+        })
+        .catch((err) => {
+          console.error("复制失败:", err);
+          ElMessage.error("复制失败，请手动复制");
+        });
+    };
+
     onMounted(async () => {
       await openDatabase();
       websites.value = await getAllWebsites();
@@ -463,13 +532,173 @@ export default {
       newAccount,
       newAccountRules,
       copyToClipboard,
+      copyAccountRow,
     };
   },
 };
 </script>
 
 <style>
-body {
+.popup-container {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-header {
+  background-color: #409eff;
+  color: white;
+  padding: 16px;
+  text-align: center;
+}
+
+.popup-header h1 {
   margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.popup-main {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.add-website-form {
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #ebeef5;
+}
+
+.add-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.website-list {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 确保表格占满剩余空间并且内容过多时出现滚动条 */
+.website-list .el-table {
+  flex: 1;
+  overflow: auto;
+}
+
+/* 隐藏表格外部的滚动条，只保留表格内部的滚动条 */
+.website-list .el-table__body-wrapper {
+  overflow-y: auto;
+  max-height: calc(100% - 40px); /* 减去表头高度 */
+}
+
+.website-link {
+  font-weight: 500;
+}
+
+.details-dialog .el-dialog__header {
+  background-color: #f5f7fa;
+  padding: 16px 20px;
+  margin: 0;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.details-dialog .el-dialog__body {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.add-account-btn {
+  margin-bottom: 16px;
+}
+
+.url-link,
+.copy-btn {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  display: inline-block;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-buttons-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.action-buttons-row .el-button {
+  padding: 6px 8px;
+  font-size: 12px;
+  min-width: 50px;
+}
+
+/* 表格样式 */
+.el-table {
+  --el-table-border-color: #ebeef5;
+  --el-table-header-background-color: #f5f7fa;
+}
+
+.el-table th {
+  background-color: #f5f7fa;
+  color: #606266;
+  font-weight: 600;
+  padding: 12px 0;
+}
+
+.el-table td {
+  padding: 12px 0;
+}
+
+/* 按钮样式 */
+.el-button--primary {
+  background-color: #409eff;
+}
+
+.el-button--danger {
+  background-color: #f56c6c;
+  color: white;
+}
+
+.el-button--success {
+  background-color: #67c23a;
+  color: white;
+}
+
+/* 确保对话框内的表格有合适的宽度 */
+.details-dialog .el-table {
+  width: 100% !important;
+}
+
+/* 确保操作按钮在小屏幕上也能正常显示 */
+@media (max-width: 768px) {
+  .action-buttons {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .action-buttons .el-button {
+    margin-bottom: 4px;
+  }
 }
 </style>

@@ -3,6 +3,7 @@ import App from "./App.vue";
 import AppWeb from "./AppWeb.vue";
 import ElementPlus from "element-plus";
 import "element-plus/dist/index.css";
+import "./assets/main.css";
 
 // 判断是否为网页环境
 const isWeb = window.location.pathname !== "/popup.html";
