@@ -14,6 +14,44 @@
             >添加网站</el-button
           >
         </el-form>
+        <div class="data-actions">
+          <div class="export-actions">
+            <el-dropdown
+              @command="handleExport"
+              split-button
+              type="success"
+              trigger="click"
+            >
+              导出数据
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="json">JSON 格式</el-dropdown-item>
+                  <el-dropdown-item command="excel"
+                    >Excel 格式</el-dropdown-item
+                  >
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+          <div class="import-actions">
+            <el-dropdown
+              @command="handleImport"
+              split-button
+              type="warning"
+              trigger="click"
+            >
+              导入数据
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="json">JSON 格式</el-dropdown-item>
+                  <el-dropdown-item command="excel"
+                    >Excel 格式</el-dropdown-item
+                  >
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </div>
       </div>
 
       <div class="website-list">
@@ -112,12 +150,31 @@
                   type="danger"
                   >删除</el-link
                 >
-                <el-link
-                  :underline="false"
-                  @click="copyAccountRow(row)"
-                  type="success"
-                  >复制</el-link
+                <el-dropdown
+                  @command="(cmd) => handleCopy(cmd, row)"
+                  trigger="click"
                 >
+                  <el-link :underline="false" type="success">复制</el-link>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="all"
+                        >复制全部信息</el-dropdown-item
+                      >
+                      <el-dropdown-item command="account"
+                        >仅复制账号</el-dropdown-item
+                      >
+                      <el-dropdown-item command="password"
+                        >仅复制密码</el-dropdown-item
+                      >
+                      <el-dropdown-item command="url"
+                        >仅复制URL</el-dropdown-item
+                      >
+                      <el-dropdown-item command="duplicate"
+                        >复制为新行</el-dropdown-item
+                      >
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </template>
           </el-table-column>
@@ -156,6 +213,61 @@
           </el-button>
         </div>
       </el-dialog>
+
+      <el-dialog
+        v-model="importDataDialog"
+        :title="`导入${importFormat === 'json' ? 'JSON' : 'Excel'} 数据`"
+        width="500"
+        :close-on-click-modal="false"
+        @closed="handleImportDialogClosed"
+      >
+        <div class="import-dialog-content">
+          <template v-if="importFormat === 'json'">
+            <p class="import-tip">请粘贴之前导出的JSON数据：</p>
+            <el-input
+              v-model="importDataText"
+              type="textarea"
+              :rows="10"
+              placeholder="粘贴JSON数据到这里"
+            ></el-input>
+          </template>
+          <template v-else>
+            <p class="import-tip">请选择Excel文件：</p>
+            <el-upload
+              class="excel-uploader"
+              action="#"
+              :auto-upload="false"
+              :on-change="handleExcelUpload"
+              :limit="1"
+              accept=".xlsx,.xls"
+              ref="excelUploadRef"
+            >
+              <el-button type="primary">选择文件</el-button>
+              <template #tip>
+                <div class="el-upload__tip">只能上传 xlsx/xls 文件</div>
+              </template>
+            </el-upload>
+            <div v-if="excelFileName" class="selected-file">
+              已选择: {{ excelFileName }}
+            </div>
+          </template>
+          <div class="import-options">
+            <el-checkbox v-model="importOverwrite">覆盖现有数据</el-checkbox>
+            <el-tooltip
+              content="选中将清空现有数据后导入，不选中则合并数据"
+              placement="top"
+            >
+              <el-icon class="info-icon"><el-icon-info-filled /></el-icon>
+            </el-tooltip>
+          </div>
+        </div>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="importDataDialog = false">取消</el-button>
+            <el-button type="primary" @click="importData">导入</el-button>
+          </div>
+        </template>
+      </el-dialog>
     </main>
   </div>
 </template>
@@ -164,7 +276,14 @@
 import { ref, reactive, onMounted, nextTick } from "vue";
 import { ElMessageBox, ElMessage } from "element-plus";
 import { v4 as uuidv4 } from "uuid";
+import { InfoFilled as ElIconInfoFilled } from "@element-plus/icons-vue";
+import * as XLSX from "xlsx";
+import dayjs from "dayjs";
+
 export default {
+  components: {
+    ElIconInfoFilled,
+  },
   setup() {
     const websites = ref([]);
     const newAccountFormRef = ref(null);
@@ -178,6 +297,13 @@ export default {
     const currentWebName = ref("");
     const dialogVisible = ref(false);
     const addAccountDialog = ref(false);
+    const importDataDialog = ref(false);
+    const importDataText = ref("");
+    const importOverwrite = ref(false);
+    const importFormat = ref("json");
+    const excelFileName = ref("");
+    const excelFileData = ref(null);
+    const excelUploadRef = ref(null);
     const newAccount = ref({
       environment: "",
       url: "",
@@ -273,38 +399,59 @@ export default {
     };
 
     // **获取所有数据**
-    const getAllWebsites = async () => {
-      if (!db) await openDatabase();
+    const getAllWebsites = () => {
       return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, "readonly");
-        const store = transaction.objectStore(storeName);
-        const request = store.getAll();
+        try {
+          const transaction = db.transaction(storeName, "readonly");
+          const store = transaction.objectStore(storeName);
+          const request = store.getAll();
 
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = (event) => reject(event.target.error);
+          request.onsuccess = (event) => {
+            const websites = event.target.result;
+            // 确保每个网站对象都有 ID
+            websites.forEach((website) => {
+              if (!website.id) {
+                website.id = uuidv4();
+              }
+            });
+            resolve(websites);
+          };
+
+          request.onerror = (event) => {
+            console.error("获取所有网站失败:", event);
+            reject("获取所有网站失败");
+          };
+        } catch (error) {
+          console.error("获取所有网站失败:", error);
+          if (db && db.memoryDB) {
+            // 使用内存数据库
+            const transaction = db.transaction();
+            const store = transaction.objectStore();
+            const request = store.getAll();
+            request.onsuccess();
+            resolve(request.result);
+          } else {
+            reject("获取所有网站失败");
+          }
+        }
       });
     };
 
     const addWebsite = async () => {
       if (!newWebsite.webName) {
-        ElMessage.error("请输入网站名字");
-        return;
-      }
-      const existingWebsite = websites.value.find(
-        (w) => w.webName === newWebsite.webName
-      );
-      if (existingWebsite) {
-        ElMessage.error("网站重复添加，请重新输入");
+        ElMessage.error("请输入网站名称");
         return;
       }
 
       try {
         const transaction = db.transaction(storeName, "readwrite");
         const store = transaction.objectStore(storeName);
-        await store.add({
+        const websiteObj = {
+          id: uuidv4(),
           webName: newWebsite.webName,
           details: [],
-        });
+        };
+        await store.add(websiteObj);
 
         websites.value = await getAllWebsites();
         newWebsite.webName = "";
@@ -481,16 +628,20 @@ export default {
       }
     };
 
-    const copyToClipboard = async (text) => {
-      try {
-        await navigator.clipboard.writeText(text);
-        ElMessage.success("复制成功");
-      } catch (err) {
-        console.error("复制失败:", err);
-        ElMessage.error("复制失败");
-      }
+    // 复制账号信息到剪贴板
+    const copyToClipboard = (text) => {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          ElMessage.success("复制成功");
+        })
+        .catch((err) => {
+          console.error("复制失败:", err);
+          ElMessage.error("复制失败，请手动复制");
+        });
     };
 
+    // 复制整行账号信息
     const copyAccountRow = (row) => {
       const text = `环境: ${row.environment}
 URL: ${row.url}
@@ -506,6 +657,519 @@ URL: ${row.url}
           console.error("复制失败:", err);
           ElMessage.error("复制失败，请手动复制");
         });
+    };
+
+    // 处理不同的复制命令
+    const handleCopy = (command, row) => {
+      let text = "";
+      let successMessage = "";
+
+      switch (command) {
+        case "all":
+          text = `环境: ${row.environment}\nURL: ${row.url}\n账号: ${row.account}\n密码: ${row.password}`;
+          successMessage = "全部账号信息已复制到剪贴板";
+          break;
+        case "account":
+          text = row.account;
+          successMessage = "账号已复制到剪贴板";
+          break;
+        case "password":
+          text = row.password;
+          successMessage = "密码已复制到剪贴板";
+          break;
+        case "url":
+          text = row.url;
+          successMessage = "URL已复制到剪贴板";
+          break;
+        case "duplicate":
+          // 复制为新行
+          duplicateAccount(row);
+          return; // 不需要执行后面的复制到剪贴板操作
+        default:
+          text = `环境: ${row.environment}\nURL: ${row.url}\n账号: ${row.account}\n密码: ${row.password}`;
+          successMessage = "账号信息已复制到剪贴板";
+      }
+
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          ElMessage.success(successMessage);
+        })
+        .catch((err) => {
+          console.error("复制失败:", err);
+          ElMessage.error("复制失败，请手动复制");
+        });
+    };
+
+    // 复制账号为新行
+    const duplicateAccount = (row) => {
+      // 打开新增账号对话框
+      addAccountDialog.value = true;
+
+      // 复制账号信息，但不复制ID
+      newAccount.value = {
+        accountId: "", // 新账号，没有ID
+        environment: `${row.environment} (复制)`, // 添加标记以区分
+        url: row.url,
+        account: row.account,
+        password: row.password,
+      };
+
+      // 提示用户
+      ElMessage.success("已复制账号信息，请修改后保存");
+    };
+
+    // 处理导出选择
+    const handleExport = (command) => {
+      if (command === "json") {
+        exportJsonData();
+      } else if (command === "excel") {
+        exportExcelData();
+      }
+    };
+
+    // 清空导入文件
+    const clearImportFile = () => {
+      excelFileName.value = "";
+      excelFileData.value = null;
+      importDataText.value = "";
+
+      // 清空文件上传组件
+      if (excelUploadRef.value) {
+        excelUploadRef.value.clearFiles();
+      }
+    };
+
+    // 处理导入对话框关闭
+    const handleImportDialogClosed = () => {
+      clearImportFile();
+    };
+
+    // 处理导入选择
+    const handleImport = (command) => {
+      importFormat.value = command;
+      importDataDialog.value = true;
+      clearImportFile();
+    };
+
+    // 处理Excel文件上传
+    const handleExcelUpload = (file) => {
+      excelFileName.value = file.name;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          excelFileData.value = data;
+        } catch (error) {
+          console.error("读取Excel文件失败:", error);
+          ElMessage.error("读取Excel文件失败");
+        }
+      };
+      reader.readAsArrayBuffer(file.raw);
+    };
+
+    // 导出数据为JSON
+    const exportJsonData = async () => {
+      try {
+        const allData = await getAllWebsites();
+
+        // 创建一个包含元数据的导出对象
+        const exportObj = {
+          version: "1.0",
+          timestamp: new Date().toISOString(),
+          data: allData,
+        };
+
+        // 转换为JSON字符串
+        const jsonStr = JSON.stringify(exportObj, null, 2);
+
+        // 创建Blob对象
+        const blob = new Blob([jsonStr], { type: "application/json" });
+
+        // 创建下载链接
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        // 使用dayjs格式化日期为年月日时分秒
+        const formattedDate = dayjs().format("YYYY-MM-DD-HH-mm-ss");
+
+        a.download = `indexDB-${formattedDate}.json`;
+        document.body.appendChild(a);
+        a.click();
+
+        // 清理
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 0);
+
+        ElMessage.success("数据导出成功");
+      } catch (error) {
+        console.error("导出数据失败:", error);
+        ElMessage.error("导出数据失败");
+      }
+    };
+
+    // 导出数据为Excel
+    const exportExcelData = async () => {
+      try {
+        const allData = await getAllWebsites();
+
+        // 准备Excel工作表数据
+        const worksheetData = [];
+
+        // 添加表头
+        worksheetData.push(["网站名称", "环境", "URL", "账号", "密码"]);
+
+        // 添加数据行
+        allData.forEach((website) => {
+          if (website.details && website.details.length > 0) {
+            website.details.forEach((detail) => {
+              worksheetData.push([
+                website.webName,
+                detail.environment,
+                detail.url,
+                detail.account,
+                detail.password,
+              ]);
+            });
+          } else {
+            // 如果没有详情，只添加网站名称
+            worksheetData.push([website.webName, "", "", "", ""]);
+          }
+        });
+
+        // 创建工作簿和工作表
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+
+        // 设置列宽
+        const colWidths = [
+          { wch: 20 }, // 网站名称
+          { wch: 15 }, // 环境
+          { wch: 30 }, // URL
+          { wch: 20 }, // 账号
+          { wch: 20 }, // 密码
+        ];
+        ws["!cols"] = colWidths;
+
+        // 添加工作表到工作簿
+        XLSX.utils.book_append_sheet(wb, ws, "网站账号");
+
+        // 格式化日期
+        const formattedDate = dayjs().format("YYYY-MM-DD-HH-mm-ss");
+
+        // 导出Excel文件
+        XLSX.writeFile(wb, `indexDB-${formattedDate}.xlsx`);
+
+        ElMessage.success("Excel数据导出成功");
+      } catch (error) {
+        console.error("导出Excel数据失败:", error);
+        ElMessage.error("导出Excel数据失败");
+      }
+    };
+
+    // 导入数据
+    const importData = async () => {
+      try {
+        if (importFormat.value === "json") {
+          if (!importDataText.value.trim()) {
+            ElMessage.warning("请先粘贴要导入的数据");
+            return;
+          }
+
+          // 解析JSON
+          let importObj;
+          try {
+            importObj = JSON.parse(importDataText.value);
+          } catch (e) {
+            ElMessage.error("无效的JSON数据格式");
+            return;
+          }
+
+          // 验证数据格式
+          if (!importObj.data || !Array.isArray(importObj.data)) {
+            ElMessage.error("导入数据格式不正确");
+            return;
+          }
+
+          // 确认导入
+          await ElMessageBox.confirm(
+            `确定要导入${importObj.data.length}条网站数据吗？${
+              importOverwrite.value ? "这将覆盖现有数据。" : ""
+            }`,
+            "导入确认",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          // 执行导入
+          const transaction = db.transaction(storeName, "readwrite");
+          const store = transaction.objectStore(storeName);
+
+          // 如果选择覆盖，先清空现有数据
+          if (importOverwrite.value) {
+            // 获取所有键并删除
+            const allKeys = await new Promise((resolve) => {
+              const keysRequest = store.getAllKeys();
+              keysRequest.onsuccess = () => resolve(keysRequest.result);
+            });
+
+            for (const key of allKeys) {
+              await new Promise((resolve) => {
+                const deleteRequest = store.delete(key);
+                deleteRequest.onsuccess = () => resolve();
+              });
+            }
+          }
+
+          // 导入新数据
+          for (const website of importObj.data) {
+            // 确保每个网站有唯一ID
+            if (!website.id) {
+              website.id = uuidv4();
+            }
+
+            // 如果不覆盖，检查是否存在同名网站
+            if (!importOverwrite.value) {
+              const existingWebsite = await new Promise((resolve) => {
+                const getRequest = store.get(website.id);
+                getRequest.onsuccess = () => resolve(getRequest.result);
+              });
+
+              if (existingWebsite) {
+                // 如果存在，生成新ID避免覆盖
+                website.id = uuidv4();
+              }
+            }
+
+            // 添加或更新网站
+            await new Promise((resolve) => {
+              const putRequest = store.put(website);
+              putRequest.onsuccess = () => resolve();
+            });
+          }
+
+          // 刷新数据
+          websites.value = await getAllWebsites();
+
+          // 关闭对话框并清空输入
+          importDataDialog.value = false;
+          importDataText.value = "";
+          importOverwrite.value = false;
+          clearImportFile();
+
+          ElMessage.success(`成功导入${importObj.data.length}条网站数据`);
+        } else if (importFormat.value === "excel") {
+          // 处理Excel导入
+          if (!excelFileData.value) {
+            ElMessage.warning("请先选择Excel文件");
+            return;
+          }
+
+          // 读取Excel文件
+          const workbook = XLSX.read(excelFileData.value, { type: "array" });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+
+          // 转换为JSON
+          const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          // 验证表头
+          const headers = excelData[0];
+          if (
+            !headers ||
+            headers.length < 5 ||
+            !headers.includes("网站名称") ||
+            !headers.includes("环境") ||
+            !headers.includes("URL") ||
+            !headers.includes("账号") ||
+            !headers.includes("密码")
+          ) {
+            ElMessage.error("Excel文件格式不正确，请确保包含正确的表头");
+            return;
+          }
+
+          // 获取列索引
+          const websiteNameIndex = headers.indexOf("网站名称");
+          const environmentIndex = headers.indexOf("环境");
+          const urlIndex = headers.indexOf("URL");
+          const accountIndex = headers.indexOf("账号");
+          const passwordIndex = headers.indexOf("密码");
+
+          // 处理数据行
+          const websiteMap = new Map();
+
+          for (let i = 1; i < excelData.length; i++) {
+            const row = excelData[i];
+            if (row.length <= 1 || !row[websiteNameIndex]) continue;
+
+            const websiteName = row[websiteNameIndex];
+
+            // 如果有环境信息，则添加详情
+            if (
+              row[environmentIndex] ||
+              row[urlIndex] ||
+              row[accountIndex] ||
+              row[passwordIndex]
+            ) {
+              const detail = {
+                accountId: uuidv4(),
+                environment: row[environmentIndex] || "",
+                url: row[urlIndex] || "",
+                account: row[accountIndex] || "",
+                password: row[passwordIndex] || "",
+              };
+
+              if (websiteMap.has(websiteName)) {
+                websiteMap.get(websiteName).details.push(detail);
+              } else {
+                websiteMap.set(websiteName, {
+                  id: uuidv4(),
+                  webName: websiteName,
+                  details: [detail],
+                });
+              }
+            } else if (!websiteMap.has(websiteName)) {
+              // 如果只有网站名称，且之前没有添加过
+              websiteMap.set(websiteName, {
+                id: uuidv4(),
+                webName: websiteName,
+                details: [],
+              });
+            }
+          }
+
+          // 转换为数组
+          const importData = Array.from(websiteMap.values());
+
+          // 确认导入
+          await ElMessageBox.confirm(
+            `确定要导入${importData.length}条网站数据吗？${
+              importOverwrite.value ? "这将覆盖现有数据。" : ""
+            }`,
+            "导入确认",
+            {
+              confirmButtonText: "确定",
+              cancelButtonText: "取消",
+              type: "warning",
+            }
+          );
+
+          // 如果选择覆盖，先清空现有数据
+          if (importOverwrite.value) {
+            // 获取所有键
+            const transaction1 = db.transaction(storeName, "readwrite");
+            const store1 = transaction1.objectStore(storeName);
+
+            const allKeys = await new Promise((resolve) => {
+              const keysRequest = store1.getAllKeys();
+              keysRequest.onsuccess = () => resolve(keysRequest.result);
+            });
+
+            // 等待事务完成
+            await new Promise((resolve) => {
+              transaction1.oncomplete = resolve;
+            });
+
+            for (const key of allKeys) {
+              // 为每个删除操作创建新事务
+              const deleteTransaction = db.transaction(storeName, "readwrite");
+              const deleteStore = deleteTransaction.objectStore(storeName);
+
+              await new Promise((resolve) => {
+                const deleteRequest = deleteStore.delete(key);
+                deleteRequest.onsuccess = () => resolve();
+              });
+
+              // 等待删除事务完成
+              await new Promise((resolve) => {
+                deleteTransaction.oncomplete = resolve;
+              });
+            }
+          }
+
+          // 导入新数据
+          for (const website of importData) {
+            // 为每个网站创建新事务
+            const transaction = db.transaction(storeName, "readwrite");
+            const store = transaction.objectStore(storeName);
+
+            // 如果不覆盖，检查是否存在同名网站
+            if (!importOverwrite.value) {
+              // 查找同名网站
+              const existingWebsite = await new Promise((resolve) => {
+                const getRequest = store.openCursor();
+                let found = null;
+
+                getRequest.onsuccess = (event) => {
+                  const cursor = event.target.result;
+                  if (cursor) {
+                    if (cursor.value.webName === website.webName) {
+                      found = cursor.value;
+                      resolve(found);
+                    } else {
+                      cursor.continue();
+                    }
+                  } else {
+                    resolve(null);
+                  }
+                };
+              });
+
+              if (existingWebsite) {
+                // 如果存在同名网站，合并详情
+                existingWebsite.details = [
+                  ...existingWebsite.details,
+                  ...website.details,
+                ];
+
+                // 更新现有网站
+                await new Promise((resolve) => {
+                  const putRequest = store.put(existingWebsite);
+                  putRequest.onsuccess = () => resolve();
+                });
+
+                // 等待事务完成
+                await new Promise((resolve) => {
+                  transaction.oncomplete = resolve;
+                });
+                continue;
+              }
+            }
+
+            // 添加新网站
+            await new Promise((resolve) => {
+              const putRequest = store.put(website);
+              putRequest.onsuccess = () => resolve();
+            });
+
+            // 等待事务完成
+            await new Promise((resolve) => {
+              transaction.oncomplete = resolve;
+            });
+          }
+
+          // 刷新数据
+          websites.value = await getAllWebsites();
+
+          // 关闭对话框并清空输入
+          importDataDialog.value = false;
+          importOverwrite.value = false;
+          clearImportFile();
+
+          ElMessage.success(`成功导入${importData.length}条网站数据`);
+        }
+      } catch (error) {
+        if (error !== "cancel") {
+          console.error("导入数据失败:", error);
+          ElMessage.error("导入数据失败: " + (error.message || error));
+          clearImportFile();
+        }
+      }
     };
 
     onMounted(async () => {
@@ -533,6 +1197,19 @@ URL: ${row.url}
       newAccountRules,
       copyToClipboard,
       copyAccountRow,
+      handleCopy,
+      duplicateAccount,
+      handleExport,
+      handleImport,
+      importData,
+      importDataDialog,
+      importDataText,
+      importOverwrite,
+      importFormat,
+      excelFileName,
+      handleExcelUpload,
+      excelUploadRef,
+      handleImportDialogClosed,
     };
   },
 };
@@ -700,5 +1377,63 @@ URL: ${row.url}
   .action-buttons .el-button {
     margin-bottom: 4px;
   }
+}
+
+/* 导入导出按钮样式 */
+.data-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  gap: 10px;
+}
+
+.export-actions,
+.import-actions {
+  flex: 1;
+}
+
+.export-actions .el-dropdown,
+.import-actions .el-dropdown {
+  width: 100%;
+}
+
+.export-actions .el-dropdown-selfdefine,
+.import-actions .el-dropdown-selfdefine {
+  width: 100%;
+}
+
+.import-dialog-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.import-tip {
+  margin-bottom: 10px;
+  color: #606266;
+}
+
+.import-options {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.info-icon {
+  margin-left: 8px;
+  color: #909399;
+  cursor: help;
+}
+
+.excel-uploader {
+  margin-bottom: 16px;
+}
+
+.selected-file {
+  margin: 10px 0;
+  padding: 8px 12px;
+  background-color: #f0f9eb;
+  color: #67c23a;
+  border-radius: 4px;
+  font-size: 14px;
 }
 </style>
