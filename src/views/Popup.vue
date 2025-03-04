@@ -4,25 +4,34 @@
       <h1>Website & Account Manager</h1>
     </header>
 
-    <main class="popup-main">
-      <div class="add-website-form">
-        <el-form :model="newWebsite" label-width="120px">
-          <el-form-item label="网站名字">
-            <el-input v-model="newWebsite.webName"></el-input>
-          </el-form-item>
-          <el-button type="primary" @click="addWebsite" class="add-btn"
-            >添加网站</el-button
-          >
-        </el-form>
-        <div class="data-actions">
-          <div class="export-actions">
+    <main class="popup-main-flex">
+      <!-- 左侧功能区 -->
+      <div class="sidebar">
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">添加网站</h3>
+          <div class="add-website-form">
+            <el-input
+              v-model="newWebsite.webName"
+              placeholder="输入网站名称"
+              class="sidebar-input"
+            ></el-input>
+            <el-button type="primary" @click="addWebsite" class="sidebar-btn"
+              >添加网站</el-button
+            >
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">数据管理</h3>
+          <div class="sidebar-buttons">
             <el-dropdown
               @command="handleExport"
-              split-button
-              type="success"
               trigger="click"
+              class="sidebar-dropdown"
             >
-              导出数据
+              <el-button type="success" class="sidebar-btn">
+                导出数据 <i class="el-icon-arrow-down el-icon--right"></i>
+              </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="json">JSON 格式</el-dropdown-item>
@@ -32,15 +41,15 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-          </div>
-          <div class="import-actions">
+
             <el-dropdown
               @command="handleImport"
-              split-button
-              type="warning"
               trigger="click"
+              class="sidebar-dropdown"
             >
-              导入数据
+              <el-button type="warning" class="sidebar-btn">
+                导入数据 <i class="el-icon-arrow-down el-icon--right"></i>
+              </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="json">JSON 格式</el-dropdown-item>
@@ -54,32 +63,35 @@
         </div>
       </div>
 
-      <div class="website-list">
-        <el-table :data="websites" style="width: 100%">
-          <el-table-column prop="webName" label="网站名字">
-            <template #default="{ row }">
-              <el-button
-                @click="showDetails(row)"
-                link
-                type="primary"
-                class="website-link"
-              >
-                {{ row.webName }}
-              </el-button>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="100">
-            <template #default="{ row }">
-              <el-button
-                @click="removeWebsite(row)"
-                link
-                type="danger"
-                size="small"
-                >删除</el-button
-              >
-            </template>
-          </el-table-column>
-        </el-table>
+      <!-- 右侧表格区域 -->
+      <div class="main-content">
+        <div class="website-list">
+          <el-table :data="websites" style="width: 100%; height: 100%">
+            <el-table-column prop="webName" label="网站名字">
+              <template #default="{ row }">
+                <el-button
+                  @click="showDetails(row)"
+                  link
+                  type="primary"
+                  class="website-link"
+                >
+                  {{ row.webName }}
+                </el-button>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100">
+              <template #default="{ row }">
+                <el-button
+                  @click="removeWebsite(row)"
+                  link
+                  type="danger"
+                  size="small"
+                  >删除</el-button
+                >
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
       </div>
 
       <el-dialog
@@ -1237,12 +1249,64 @@ URL: ${row.url}
   font-weight: 600;
 }
 
-.popup-main {
-  padding: 20px;
+.popup-main-flex {
+  display: flex;
   flex: 1;
+  overflow: hidden;
+}
+
+/* 左侧边栏样式 */
+.sidebar {
+  width: 250px;
+  background-color: #f5f7fa;
+  border-right: 1px solid #ebeef5;
+  padding: 16px;
   display: flex;
   flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-title {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 16px;
+  color: #303133;
+  font-weight: 600;
+}
+
+.sidebar-input {
+  margin-bottom: 12px;
+}
+
+.sidebar-btn {
+  width: 100%;
+}
+
+.sidebar-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar-dropdown {
+  width: 100%;
+}
+
+/* 主内容区样式 */
+.main-content {
+  flex: 1;
+  padding: 16px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .add-website-form {
